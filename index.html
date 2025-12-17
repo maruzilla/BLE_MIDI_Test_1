@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLE MIDI Piano App</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    #piano { display: flex; flex-wrap: wrap; justify-content: center; }
+    .key { width: 30px; height: 120px; margin: 2px; border: 1px solid black; }
+    .white { background-color: white; }
+    .black { background-color: black; width: 20px; height: 80px; margin-top: 0px; margin-left: -10px; position: relative; z-index: 1; }
+    #controls { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>BLE MIDI Piano App</h1>
+
+  <!-- ピアノのキー部分 -->
+  <div id="piano"></div>
+
+  <!-- MIDI関連のコントロール -->
+  <div id="controls">
+    <label>入力デバイス: <select id="input"></select></label><br>
+    <label>出力デバイス: <select id="output"></select></label><br>
+    <label>チャンネル: <select id="channel"></select></label><br>
+    <label>音色: <select id="program"></select></label><br>
+    <label>オクターブ: <input type="range" id="octave" min="1" max="6" value="4"></label><br>
+    <label>トランスポーズ: <input type="range" id="transpose" min="-12" max="12" value="0"></label><br>
+    <label>ボリューム: <input type="range" id="volume" min="0" max="127" value="100"></label><br>
+    <button id="connect">BLE MIDI 接続</button>
+  </div>
+
+  <script>
+    // ピアノの初期設定（4オクターブ）
+    const NUM_OCTAVES = 4;
+    const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const piano = document.getElementById('piano');
+
+    // ピアノの鍵盤を生成する関数
+    function createPianoKeys() {
+      for (let i = 0; i < NUM_OCTAVES * 12; i++) {
+        const key = document.createElement('div');
+        key.className = keys[i % 12].includes('#') ? 'key black' : 'key white';
+        key.dataset.note = i;
+        key.addEventListener('mousedown', () => playNoteOn(i));
+        key.addEventListener('mouseup', () => playNoteOff(i));
+        piano.appendChild(key);
+      }
+    }
+
+    createPianoKeys(); // 鍵盤の描画
+
+    // BLE MIDI デバイス用変数
+    let midiAccess;
+    let inputDevice, outputDevice;
+
+    // Web MIDI APIの初期化とデバイスの列挙
+    navigator.requestMIDIAccess().then(access => {
+      midiAccess = access;
+      updateDeviceLists();
+    });
+
+    function updateDeviceLists() {
+      const inputSelect = document.getElementById('input');
+      const outputSelect = document.getElementById('output');
+
+      inputSelect.innerHTML = '';
+      outputSelect.innerHTML = '';
+
+      midiAccess.inputs.forEach(input => {
+        const option = document.createElement('option');
+        option.value = input.id;
+        option.textContent = input.name;
+        inputSelect.appendChild(option);
+      });
+
+      midiAccess.outputs.forEach(output => {
+        const option = document.createElement('option');
+        option.value = output.id;
+        option.textContent = output.name;
+        outputSelect.appendChild(option);
+      });
+    }
+
+    // ノートオンメッセージを送信
+    function playNoteOn(note) {
+      const octave = parseInt(document.getElementById('octave').value);
+      const transpose = parseInt(document.getElementById('transpose').value);
+      const volume = parseInt(document.getElementById('volume').value);
+      const channel = parseInt(document.getElementById('channel').value) - 1;
+      const midiNote = 12 * (octave - 1) + note + transpose;
+
+      if (outputDevice) {
+        outputDevice.send([0x90 + channel, midiNote, volume]);
+      }
+    }
+
+    // ノートオフメッセージを送信
+    function playNoteOff(note) {
+      const octave = parseInt(document.getElementById('octave').value);
+      const transpose = parseInt(document.getElementById('transpose').value);
+      const channel = parseInt(document.getElementById('channel').value) - 1;
+      const midiNote = 12 * (octave - 1) + note + transpose;
+
+      if (outputDevice) {
+        outputDevice.send([0x80 + channel, midiNote, 0]);
+      }
+    }
+
+    // BLE MIDIデバイス接続ボタンの処理
+    document.getElementById('connect').addEventListener('click', async () => {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: false,			//true
+          //optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700']
+          filters: [{ services: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700'] }]
+        });
+        console.log('デバイスに接続しました:', device);
+      } catch (error) {
+        console.error('接続エラー:', error);
+      }
+    });
+
+    // MIDI出力デバイスの変更
+    document.getElementById('output').addEventListener('change', (e) => {
+      outputDevice = midiAccess.outputs.get(e.target.value);
+    });
+  </script>
+</body>
+</html>
