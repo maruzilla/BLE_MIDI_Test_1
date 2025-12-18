@@ -112,9 +112,9 @@
     document.getElementById('connect').addEventListener('click', async () => {
       try {
         const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: false,			//true
-          //optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700']
-          filters: [{ services: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700'] }]
+          acceptAllDevices: true,			//true
+          optionalServices: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700']
+          //filters: [{ services: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700'] }]
         });
         console.log('デバイスに接続しました:', device);
       } catch (error) {
